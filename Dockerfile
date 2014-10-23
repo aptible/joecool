@@ -18,4 +18,9 @@ ADD bin/run-joe-cool.sh run-joe-cool.sh
 ADD test /tmp/test
 RUN bats /tmp/test
 
+# Any docker logs need to be mounted at /tmp/dockerlogs. Typically, this means that
+# a volume should be created mapping /var/lib/docker/containers to /tmp/dockerlogs
+# in the container.
+VOLUME ["/tmp/dockerlogs"]
+
 CMD ["/bin/bash", "run-joe-cool.sh"]

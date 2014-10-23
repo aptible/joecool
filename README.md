@@ -27,15 +27,11 @@ prefix of the docker id of this container to monitor it. We use `deadbeef` for t
 we set up Joe Cool and Gentleman Jerry to watch this container, anything you type in the bash shell will
 get logged.
 
-Finally, build Joe Cool:
+Next, pull the image from quay (`docker pull quay.io/aptible/joecool`) or build it locally
+(`make build`). The image name will be `quay.io/aptible/joecool:latest` if you pull or build
+from the `master` branch.
 
-```
-$ make build
-...
-Successfully built 3b91c2742d29
-```
-
-And run the `run-joe-cool.sh` script inside the resulting container:
+Finally, run the `run-joe-cool.sh` script in a container created from the resulting image:
 
 ```
 $ docker run -i -t \
@@ -43,7 +39,7 @@ $ docker run -i -t \
 >   -e "LOGSTASH_CERTIFICATE=`cat /tmp/jerry-cert/jerry.crt`" \
 >   -e "CONTAINERS_TO_MONITOR=deadbeef" \
 >   -v /var/lib/docker/containers:/tmp/dockerlogs:ro \
->   3b91c2742d29
+>   quay.io/aptible/joecool:latest
 ```
 
 You should now see any output in the `deadbeef` container picked up by Joe Cool and sent to Gentleman 
