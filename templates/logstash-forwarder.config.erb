@@ -1,0 +1,19 @@
+{
+  "network": {
+    "servers": [ "<%= ENV['LOGSTASH_ENDPOINT'] %>" ],
+    "timeout": <%= ENV['LOGSTASH_TIMEOUT'] || 15 %>,
+    "ssl ca": "logstash.crt"
+  },
+  "files": [
+    {
+      "paths": [
+        <%= (ENV['CONTAINERS_TO_MONITOR'] || "").split(",").map do |container_id| 
+                "\"/tmp/dockerlogs/#{container_id.strip}*/*-json.log\"" 
+            end.join(',') %>
+       ],
+      "fields": { 
+        "service" : "<%= ENV['SERVICE_NAME'] || '*' %>"
+      }
+    }
+   ]
+}
