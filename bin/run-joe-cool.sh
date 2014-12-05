@@ -9,4 +9,4 @@ fi
 erb logstash-forwarder.config.erb > logstash-forwarder/logstash-forwarder.config && \
 cd logstash-forwarder && \
 echo "$LOGSTASH_CERTIFICATE" > logstash.crt && \
-./logstash-forwarder -config logstash-forwarder.config -idle-flush-time 1s
+./logstash-forwarder -config logstash-forwarder.config -idle-flush-time 1s ${READ_FROM_BEGINNING:+-from-beginning=true}
