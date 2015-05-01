@@ -4,11 +4,14 @@ FROM quay.io/aptible/ubuntu:14.04
 RUN apt-get update && \
     apt-get install -y git golang ruby && \
     apt-get clean && \
-    git clone git://github.com/elasticsearch/logstash-forwarder.git
+    git clone git://github.com/aaw/logstash-forwarder.git && \
+    cd logstash-forwarder && \
+    git reset --hard 141d0c5d6077fa9dfbd3b6ac6b37eb0a2bd81498
 
 # Build logstash-forwarder from source, verify the resulting SHA against a golden SHA.
-RUN cd logstash-forwarder && git checkout tags/v0.3.1 && go build && \
-    echo "f7189190e21c3eb99b43fb429650ec0abfbf917a  logstash-forwarder" | sha1sum -c -
+RUN cd logstash-forwarder && \
+    go build && \
+    echo "e582ccd6bf851bfd63fa349004170afc81fec37d logstash-forwarder" | sha1sum -c -
 
 # Add the logstash-forwarder config template and the bash script to run Joe Cool.
 ADD templates/logstash-forwarder.config.erb logstash-forwarder.config.erb
