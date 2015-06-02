@@ -11,4 +11,4 @@ fi
 erb logstash-forwarder.config.erb > logstash-forwarder/logstash-forwarder.config && \
 cd logstash-forwarder && \
 echo "$LOGSTASH_CERTIFICATE" > logstash.crt && \
-./logstash-forwarder -config logstash-forwarder.config -max-line-bytes=101376 $TAIL_OPT
+exec ./logstash-forwarder -config logstash-forwarder.config -max-line-bytes=101376 $TAIL_OPT

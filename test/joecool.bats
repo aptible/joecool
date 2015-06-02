@@ -62,7 +62,7 @@ teardown() {
   # Cool tailing the correct files (only foodeadbeef).
 
   echo "no-op" | nc -l -p 5555 &
-  run timeout 1s /bin/bash run-joe-cool.sh
+  run timeout -t 1 /bin/bash run-joe-cool.sh
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
   [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
 }
@@ -80,7 +80,7 @@ teardown() {
 
   # Our fake logs have 10 characters in them. Since we set READ_FROM_BEGINNING,
   # the logstash forwarder should report that its file offset is 0.
-  run timeout 1s /bin/bash run-joe-cool.sh
+  run timeout -t 1 /bin/bash run-joe-cool.sh
   [[ "$output" =~ "tail (on-rotation):  false" ]]
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
   [[ "$output" =~ "harvest: \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:0)" ]]
@@ -98,7 +98,7 @@ teardown() {
 
   # Our fake logs have 10 characters in them. Since we didn't set READ_FROM_BEGINNING,
   # the logstash forwarder should report that its file offset is 11.
-  run timeout 1s /bin/bash run-joe-cool.sh
+  run timeout -t 1 /bin/bash run-joe-cool.sh
   [[ "$output" =~ "tail (on-rotation):  true" ]]
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
   [[ "$output" =~ "harvest: (tailing) \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:11)" ]]
@@ -116,7 +116,7 @@ teardown() {
   printf "%0.s-" {1..101376} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
 
   # We haven't gone over our limit of 99KB in a line, so we should not see truncation.
-  run timeout 1s /bin/bash run-joe-cool.sh
+  run timeout -t 1 /bin/bash run-joe-cool.sh
 
   [[ "$output" =~ "max-line-bytes:      101376" ]]
   [[ ! "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
@@ -134,7 +134,7 @@ teardown() {
   printf "%0.s-" {1..101377} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
 
   # We've gone over our limit of 99KB in a line, so we should see a truncation.
-  run timeout 1s /bin/bash run-joe-cool.sh
+  run timeout -t 1 /bin/bash run-joe-cool.sh
 
   [[ "$output" =~ "max-line-bytes:      101376" ]]
   [[ "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
