@@ -61,10 +61,10 @@ teardown() {
   # 127.0.0.1:5555 and the environment variables we've set are enough to bring up a Joe
   # Cool tailing the correct files (only foodeadbeef).
 
-  tcpserver 127.0.0.1 5555 echo "no-op" &
-  run timeout 1s /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "Starting harvester: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
-  [[ ! "$output" =~ "Starting harvester: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
+  echo "no-op" | nc -l -p 5555 &
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
+  [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
 }
 
 @test "Joe Cool respects the READ_FROM_BEGINNING flag" {
@@ -80,9 +80,10 @@ teardown() {
 
   # Our fake logs have 10 characters in them. Since we set READ_FROM_BEGINNING,
   # the logstash forwarder should report that its file offset is 0.
-  run timeout 1s /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "Starting harvester: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
-  [[ "$output" =~ "Current file offset: 0" ]]
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "tail (on-rotation):  false" ]]
+  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
+  [[ "$output" =~ "harvest: \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:0)" ]]
 }
 
 @test "Joe Cool tails logs if the READ_FROM_BEGINNING flag isn't set" {
@@ -97,7 +98,44 @@ teardown() {
 
   # Our fake logs have 10 characters in them. Since we didn't set READ_FROM_BEGINNING,
   # the logstash forwarder should report that its file offset is 11.
-  run timeout 1s /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "Starting harvester: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
-  [[ "$output" =~ "Current file offset: 11" ]]
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "tail (on-rotation):  true" ]]
+  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
+  [[ "$output" =~ "harvest: (tailing) \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:11)" ]]
+}
+
+@test "Joe Cool does not truncate lines that are at most 99KB" {
+  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
+  export LOGSTASH_ENDPOINT=localhost:5555
+  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
+  export CONTAINERS_TO_MONITOR=deadbeef
+  export READ_FROM_BEGINNING=1
+
+  # Set up fake Docker logs with exactly 99 KB of data on one line.
+  mkdir /tmp/dockerlogs/deadbeef
+  printf "%0.s-" {1..101376} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+
+  # We haven't gone over our limit of 99KB in a line, so we should not see truncation.
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+
+  [[ "$output" =~ "max-line-bytes:      101376" ]]
+  [[ ! "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
+}
+
+@test "Joe Cool will cut you if you try to send lines longer than 99KB" {
+  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
+  export LOGSTASH_ENDPOINT=localhost:5555
+  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
+  export CONTAINERS_TO_MONITOR=deadbeef
+  export READ_FROM_BEGINNING=1
+
+  # Set up fake Docker logs with more than 99 KB of data on one line.
+  mkdir /tmp/dockerlogs/deadbeef
+  printf "%0.s-" {1..101377} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+
+  # We've gone over our limit of 99KB in a line, so we should see a truncation.
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+
+  [[ "$output" =~ "max-line-bytes:      101376" ]]
+  [[ "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
 }
