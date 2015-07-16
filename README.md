@@ -2,16 +2,18 @@
 
 ![](https://quay.io/repository/aptible/joecool/status?token=c28d9560-c6f8-43bd-8b8c-7111009c47c0)
 
-Forwards logs from a set of Docker containers to [Gentleman Jerry](https://github.com/aptible/gentlemanjerry).
+A Docker image that forwards logs from a set of Docker containers to
+[Gentleman Jerry](https://github.com/aptible/gentlemanjerry).
 
-Joe Cool is implemented as a [logstash-forwarder](https://github.com/elasticsearch/logstash-forwarder)
-instance that tracks a set of docker logs. Docker logs are read by mounting /var/lib/docker/containers
-inside the Joe Cool container.
+Joe Cool is implemented as a wrapper around a [logstash-forwarder](https://github.com/elasticsearch/logstash-forwarder)
+instance that tracks logs (any stdout/stderr) from a set of Docker containers. Docker container logs are
+read by mounting `/var/lib/docker/containers` inside the Joe Cool container. Joe Cool uses a modified
+logstash-forwarder that includes some Docker-specific improvements and bug fixes.
 
-[Sweetness](https://github.com/aptible/sweetness) spawns Joe Cools to track each set of containers
-corresponding to a particular service on a single instance. For example, if one account has 2 web
-processes and 1 worker running on an instance and another account has 1 worker running on the same
-instance, Sweetness would spawn 3 Joe Cools, one for each account-service combination on the instance.
+[Aptible](https://www.aptible.com)'s platform uses Joe Cools to forward logs from each set of containers
+corresponding to a particular service. For example, an application consisting of 2 web processes and
+1 worker process would have 2 Joe Cools forwarding logs, one watching both web processes and one watching
+the worker process.
 
 ## Example
 
