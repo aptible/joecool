@@ -13,7 +13,8 @@
             end.join(',') %>
        ],
       "fields": {
-        "service" : "<%= ENV['SERVICE_NAME'] || '*' %>"
+        "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
+        "app": "<%= ENV['APP_NAME'] || '*' %>"
       }
     }
    ]

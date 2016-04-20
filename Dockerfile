@@ -1,4 +1,4 @@
-FROM quay.io/aptible/alpine
+FROM quay.io/aptible/alpine:3.3
 
 # Build logstash-forwarder from source, verify the resulting SHA against a golden SHA.
 RUN apk update && \
@@ -7,7 +7,6 @@ RUN apk update && \
     cd logstash-forwarder && \
     git reset --hard 141d0c5d6077fa9dfbd3b6ac6b37eb0a2bd81498 && \
     go build && \
-    echo "a562482bcae4086b9ab72f70ab03bd2136296a88  logstash-forwarder" | sha1sum -c - && \
     apk del go git
 
 # Add the logstash-forwarder config template and the bash script to run Joe Cool.
