@@ -1,6 +1,7 @@
 # ![](https://raw.github.com/aptible/straptible/master/lib/straptible/rails/templates/public.api/icon-60px.png) Joe Cool
 
 ![](https://quay.io/repository/aptible/joecool/status?token=c28d9560-c6f8-43bd-8b8c-7111009c47c0)
+[![Build Status](https://travis-ci.org/aptible/joecool.svg?branch=master)](https://travis-ci.org/aptible/joecool)
 
 A Docker image that forwards logs from a set of Docker containers to
 [Gentleman Jerry](https://github.com/aptible/gentlemanjerry).
