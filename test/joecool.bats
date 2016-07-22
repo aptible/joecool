@@ -2,11 +2,13 @@
 
 setup() {
   mkdir /tmp/dockerlogs
+  mkdir /tmp/activitylogs
   mkdir /tmp/test-support
 }
 
 teardown() {
   rm -rf /tmp/dockerlogs
+  rm -rf /tmp/activitylogs
   rm -rf /tmp/test-support
 }
 
@@ -56,6 +58,9 @@ teardown() {
   touch /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log
   touch /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log
 
+  touch /tmp/activitylogs/foodeadbeef-json.log
+  touch /tmp/activitylogs/bardeadbeef-json.log
+
   # CONTAINERS_TO_MONITOR sets this Joe Cool instance up to monitor containers that start
   # with foo, fee, or fuu. We'll just verify that setting up a fake server listening on
   # 127.0.0.1:5555 and the environment variables we've set are enough to bring up a Joe
@@ -64,7 +69,9 @@ teardown() {
   echo "no-op" | nc -l -p 5555 &
   run timeout -t 1 /bin/bash run-joe-cool.sh
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
+  [[ "$output" =~ "Launching harvester on new file: /tmp/activitylogs/foodeadbeef-json.log" ]]
   [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
+  [[ ! "$output" =~ "Launching harvester on new file: /tmp/activitylogs/bardeadbeef-json.log" ]]
 }
 
 @test "Joe Cool respects the READ_FROM_BEGINNING flag" {
@@ -78,12 +85,15 @@ teardown() {
   mkdir /tmp/dockerlogs/deadbeef
   echo 0123456789 > /tmp/dockerlogs/deadbeef/deadbeef-json.log
 
+  echo 0123456789 > /tmp/activitylogs/deadbeef-json.log
+
   # Our fake logs have 10 characters in them. Since we set READ_FROM_BEGINNING,
   # the logstash forwarder should report that its file offset is 0.
   run timeout -t 1 /bin/bash run-joe-cool.sh
   [[ "$output" =~ "tail (on-rotation):  false" ]]
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
   [[ "$output" =~ "harvest: \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:0)" ]]
+  [[ "$output" =~ "harvest: \"/tmp/activitylogs/deadbeef-json.log\" (offset snapshot:0)" ]]
 }
 
 @test "Joe Cool tails logs if the READ_FROM_BEGINNING flag isn't set" {
