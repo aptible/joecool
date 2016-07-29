@@ -14,7 +14,20 @@
        ],
       "fields": {
         "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
-        "app": "<%= ENV['APP_NAME'] || '*' %>"
+        "app": "<%= ENV['APP_NAME'] || '*' %>",
+        "source": "app"
+      }
+    },
+    {
+      "paths": [
+        <%= (ENV['CONTAINERS_TO_MONITOR'] || "").split(",").map do |container_id|
+                "\"/tmp/activitylogs/#{container_id.strip}*-json.log\""
+            end.join(',') %>
+       ],
+      "fields": {
+        "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
+        "app": "<%= ENV['APP_NAME'] || '*' %>",
+        "source": "aptible"
       }
     }
    ]
