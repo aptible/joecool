@@ -46,6 +46,15 @@ teardown() {
   [[ "$output" =~ "/tmp/dockerlogs" ]]
 }
 
+@test "Joe Cool does not require the /tmp/activitylogs directory to exist" {
+  export LOGSTASH_ENDPOINT=foo
+  export LOGSTASH_CERTIFICATE=bar
+  export CONTAINERS_TO_MONITOR=baz
+  rm -rf /tmp/activitylogs
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "prospectors initialised" ]]
+}
+
 @test "Joe Cool forwards logs to a logstash instance" {
   openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
   export LOGSTASH_ENDPOINT=localhost:5555
