@@ -10,6 +10,7 @@ teardown() {
   rm -rf /tmp/dockerlogs
   rm -rf /tmp/activitylogs
   rm -rf /tmp/test-support
+  rm -f /tmp/read-from-beginning
 }
 
 @test "Joe Cool requires the LOGSTASH_ENDPOINT environment variable to be set" {
@@ -83,7 +84,7 @@ teardown() {
   [[ ! "$output" =~ "Launching harvester on new file: /tmp/activitylogs/bardeadbeef-json.log" ]]
 }
 
-@test "Joe Cool respects the READ_FROM_BEGINNING flag" {
+@test "Joe Cool sends all logs once if READ_FROM_BEGINNING is set" {
   openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
   export LOGSTASH_ENDPOINT=localhost:5555
   export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
@@ -103,6 +104,12 @@ teardown() {
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
   [[ "$output" =~ "harvest: \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:0)" ]]
   [[ "$output" =~ "harvest: \"/tmp/activitylogs/deadbeef-json.log\" (offset snapshot:0)" ]]
+
+  # If we run a second time, then Joecool should *not* send the logs again.
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "tail (on-rotation):  true" ]]
+  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
+  [[ "$output" =~ "harvest: (tailing) \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:11)" ]]
 }
 
 @test "Joe Cool tails logs if the READ_FROM_BEGINNING flag isn't set" {
