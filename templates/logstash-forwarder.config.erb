@@ -16,6 +16,7 @@
       "fields": {
         "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
         "<%= layer %>": "<%= ENV['APP_NAME'] || ENV['DATABASE_NAME'] || '*' %>",
+        "<%= layer %>_id": "<%= ENV['APP_ID'] || ENV['DATABASE_ID'] || '*' %>",
         "source": "<%= layer %>",
         "layer": "<%= layer %>"
       }
@@ -29,6 +30,7 @@
       "fields": {
         "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
         "<%= layer %>": "<%= ENV['APP_NAME'] || ENV['DATABASE_NAME'] || '*' %>",
+        "<%= layer %>_id": "<%= ENV['APP_ID'] || ENV['DATABASE_ID'] || '*' %>",
         "source": "aptible",
         "layer": "<%= layer %>"
       }
