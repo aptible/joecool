@@ -1,3 +1,4 @@
+<% layer = ENV['APP_NAME'] ? 'app' : 'database' %>
 {
   "network": {
     "servers": [ "<%= ENV['LOGSTASH_ENDPOINT'] %>" ],
@@ -14,8 +15,10 @@
        ],
       "fields": {
         "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
-        "app": "<%= ENV['APP_NAME'] || '*' %>",
-        "source": "app"
+        "<%= layer %>": "<%= ENV['APP_NAME'] || ENV['DATABASE_NAME'] || '*' %>",
+        "<%= layer %>_id": "<%= ENV['APP_ID'] || ENV['DATABASE_ID'] || '*' %>",
+        "source": "<%= layer %>",
+        "layer": "<%= layer %>"
       }
     },
     {
@@ -26,8 +29,10 @@
        ],
       "fields": {
         "service": "<%= ENV['SERVICE_NAME'] || '*' %>",
-        "app": "<%= ENV['APP_NAME'] || '*' %>",
-        "source": "aptible"
+        "<%= layer %>": "<%= ENV['APP_NAME'] || ENV['DATABASE_NAME'] || '*' %>",
+        "<%= layer %>_id": "<%= ENV['APP_ID'] || ENV['DATABASE_ID'] || '*' %>",
+        "source": "aptible",
+        "layer": "<%= layer %>"
       }
     }
    ]
