@@ -3,7 +3,6 @@ set -o errexit
 
 : ${LOGSTASH_ENDPOINT:?"Error: environment variable LOGSTASH_ENDPOINT should contain the Gentleman Jerry endpoint."}
 : ${LOGSTASH_CERTIFICATE:?"Error: environment variable LOGSTASH_CERTIFICATE should contain Gentleman Jerry's certificate."}
-: ${CONTAINERS_TO_MONITOR:?"Error: environment variable CONTAINERS_TO_MONITOR should contain a comma-separated list of container ids."}
 
 if [ ! -d /tmp/dockerlogs ]; then
   echo "/tmp/dockerlogs should exist and contain Docker logs."
@@ -31,7 +30,15 @@ if [[ -n "$READ_FROM_BEGINNING" ]] && [[ ! -f "$HAS_READ_FROM_BEGINNING" ]]; the
   TAIL_OPT=""
 fi
 
-erb logstash-forwarder.config.erb > logstash-forwarder/logstash-forwarder.config
+CONFIG=logstash-forwarder/logstash-forwarder.config
+
+if [[ -n "${JSON_CONFIGURATION:-}" ]]; then
+  ruby generate-config.rb > "$CONFIG"
+else
+  : ${CONTAINERS_TO_MONITOR:?"Error: environment variable CONTAINERS_TO_MONITOR should contain a comma-separated list of container ids."}
+  erb logstash-forwarder.config.erb > "$CONFIG"
+fi
+
 cd logstash-forwarder
 echo "$LOGSTASH_CERTIFICATE" > logstash.crt
 

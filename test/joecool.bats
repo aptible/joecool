@@ -11,6 +11,7 @@ teardown() {
   rm -rf /tmp/activitylogs
   rm -rf /tmp/test-support
   rm -f /tmp/read-from-beginning
+  killall -KILL nc || true
 }
 
 @test "Joe Cool requires the LOGSTASH_ENDPOINT environment variable to be set" {
@@ -78,6 +79,35 @@ teardown() {
 
   echo "no-op" | nc -l -p 5555 &
   run timeout -t 1 /bin/bash run-joe-cool.sh
+  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
+  [[ "$output" =~ "Launching harvester on new file: /tmp/activitylogs/foodeadbeef-json.log" ]]
+  [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
+  [[ ! "$output" =~ "Launching harvester on new file: /tmp/activitylogs/bardeadbeef-json.log" ]]
+}
+
+@test "Joe Cool forwards logs to a logstash instance (JSON configuration)" {
+  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
+
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost:5555
+  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
+  export CONTAINERS='["foo", "fee", "fuu"]'
+  export FIELDS='{}'
+
+  # Set up fake Docker logs
+  mkdir /tmp/dockerlogs/foodeadbeef
+  mkdir /tmp/dockerlogs/bardeadbeef
+  touch /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log
+  touch /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log
+
+  touch /tmp/activitylogs/foodeadbeef-json.log
+  touch /tmp/activitylogs/bardeadbeef-json.log
+
+  echo "no-op" | nc -l -p 5555 &
+  run timeout -t 1 /bin/bash run-joe-cool.sh
+
+  echo "$output"
+
   [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
   [[ "$output" =~ "Launching harvester on new file: /tmp/activitylogs/foodeadbeef-json.log" ]]
   [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
