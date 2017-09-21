@@ -2,7 +2,7 @@ FROM quay.io/aptible/alpine:3.3
 
 # Build logstash-forwarder from source, verify the resulting SHA against a golden SHA.
 RUN apk update && \
-    apk-install git go ruby && \
+    apk-install git go ruby ruby-json && \
     git clone git://github.com/aaw/logstash-forwarder.git && \
     cd logstash-forwarder && \
     git reset --hard 141d0c5d6077fa9dfbd3b6ac6b37eb0a2bd81498 && \
@@ -12,6 +12,7 @@ RUN apk update && \
 # Add the logstash-forwarder config template and the bash script to run Joe Cool.
 ADD templates/logstash-forwarder.config.erb logstash-forwarder.config.erb
 ADD bin/run-joe-cool.sh run-joe-cool.sh
+ADD bin/generate-config.rb generate-config.rb
 
 # Run tests.
 ADD test /tmp/test
