@@ -1,0 +1,93 @@
+<% require 'json' %>
+<% layer = ENV['APP_NAME'] ? 'app' : 'database' %>
+#=========================== Filebeat inputs =============================
+
+filebeat.inputs:
+
+  # Each - is an input. Most options can be set at the input level, so
+  # you can use different inputs for various configurations.
+  # Below are the input specific configurations.
+
+  # TODO: Incorporate TAIL env var to determine where to start in the file
+  - type: log
+
+    <% unless ENV['TAIL'] == "0" %>
+    tail_files: true
+    <% end %>
+
+    # Change to true to enable this input configuration.
+    enabled: true
+
+    # Paths that should be crawled and fetched. Glob based paths.
+    <% JSON.parse(ENV['CONTAINERS'] || '[]').each do |container_id| %>
+    paths:
+      - /tmp/dockerlogs/<%= container_id %>/<%= container_id %>-json.log
+    # Optional additional fields. These fields can be freely picked
+    # to add additional information to the crawled log files for filtering
+    fields_under_root: true
+    fields:
+      <% JSON.parse(ENV['FIELDS'] || '{}').each do |k, v| %>
+      <%= k %>: "<%= v %>"
+      <% end %>
+      container: "<%= container_id %>"
+      type: json
+
+    max_bytes: 101376
+    <% end %>
+
+  - type: log
+
+    <% unless ENV['TAIL'] == "0" %>
+    tail_files: true
+    <% end %>
+
+    # Change to true to enable this input configuration.
+    enabled: true
+
+    # Paths that should be crawled and fetched. Glob based paths.
+    <% JSON.parse(ENV['CONTAINERS'] || '[]').each do |container_id| %>
+    paths:
+      - /tmp/activitylogs/<%= container_id %>-json.log
+
+    # Optional additional fields. These fields can be freely picked
+    # to add additional information to the crawled log files for filtering
+    fields_under_root: true
+    fields:
+      <% JSON.parse(ENV['FIELDS'] || '{}').each do |k, v| %><% if k != "source" %>
+      <%= k %>: "<%= v %>"
+      <% end %><% end %>
+      source: "aptible"
+      container: "<%= container_id %>"
+      type: json
+
+    max_bytes: 101376
+    <% end %>
+
+#============================== Redis output ==================================
+
+output.redis:
+  hosts: ["<%= ENV['LOGSTASH_ENDPOINT'].split(':')[0] %>:<%= ENV['TAIL_PORT'] %>"]
+  password: "<%= ENV['TAIL_PASSWORD'] %>"
+  key: "filebeat"
+  db: 1
+  timeout: <%= ENV['LOGSTASH_TIMEOUT'] || 15 %>
+  <% unless ENV['DISABLE_SSL'] %>
+  ssl:
+    enabled: true
+    certificate_authorities: ["<%= ENV['FILEBEAT_HOME'] %>/logstash.crt"]
+  <% end %>
+
+#================================ Logging =====================================
+
+logging:
+  metrics:
+    enabled: true
+  <% if ENV['DEBUG'] %>
+  # Sets log level. The default log level is info.
+  # Available log levels are: error, warning, info, debug
+  level: debug
+  # At debug level, you can selectively enable logging only for some components.
+  # To enable all selectors use ["*"]. Examples of other selectors are "beat",
+  # "publish", "service".
+  selectors: ["*"]
+  <% end %>
