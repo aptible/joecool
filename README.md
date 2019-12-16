@@ -6,10 +6,10 @@
 A Docker image that forwards logs from a set of Docker containers to
 [Gentleman Jerry](https://github.com/aptible/gentlemanjerry).
 
-Joe Cool is implemented as a wrapper around a [logstash-forwarder](https://github.com/elasticsearch/logstash-forwarder)
+Joe Cool is implemented as a wrapper around a [filebeat](https://github.com/elastic/beats/tree/master/filebeat)
 instance that tracks logs (any stdout/stderr) from a set of Docker containers. Docker container logs are
 read by mounting `/var/lib/docker/containers` inside the Joe Cool container. Joe Cool uses a modified
-logstash-forwarder that includes some Docker-specific improvements and bug fixes.
+filebeat that includes some Docker-specific improvements and bug fixes.
 
 [Aptible](https://www.aptible.com)'s platform uses Joe Cools to forward logs from each set of containers
 corresponding to a particular service. For example, an application consisting of 2 web processes and
@@ -40,7 +40,7 @@ Finally, run the `run-joe-cool.sh` script in a container created from the result
 $ docker run -i -t \
 >   -e "LOGSTASH_ENDPOINT=gentlemanjerry:1234" \
 >   -e "LOGSTASH_CERTIFICATE=`cat /tmp/jerry-cert/jerry.crt`" \
->   -e "CONTAINERS_TO_MONITOR=deadbeef" \
+>   -e "CONTAINERS="[\"deadbeef\"]" \
 >   -v /var/lib/docker/containers:/tmp/dockerlogs:ro \
 >   quay.io/aptible/joecool:latest
 ```
@@ -55,10 +55,9 @@ Runtime behavior of Joe Cool can be modified by passing the following environmen
 
 * `LOGSTASH_ENDPOINT`: Required. The endpoint where Gentleman Jerry is running.
 * `LOGSTASH_CERTIFICATE`: Required. Gentleman Jerry's certificate.
-* `CONTAINERS_TO_MONITOR`: Required. A comma-separated list of docker container id prefixes. Specifies
+* `CONTAINERS`: Required. A JSON-formatted list of docker container id prefixes. Specifies
    which containers Joe Cool will monitor for logs.
-* `SERVICE_NAME`: Optional. Correpsonds to the "service" field reported to Gentleman Jerry. Default
-   is '*'.
+* `SERVICE_NAME`: Optional. Corresponds to the "service" field reported to Gentleman Jerry.
 * `READ_FROM_BEGINNING`: Optional. If this variable is set, the entire contents of log files will be
    forwarded. The default behavior is to only tail the log files.
 
@@ -67,6 +66,7 @@ Runtime behavior of Joe Cool can be modified by passing the following environmen
 All tests are implemented in bats. Run them with:
 
     make build
+
 
 ## Copyright
 

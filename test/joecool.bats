@@ -6,17 +6,27 @@ setup() {
   mkdir /tmp/test-support
 }
 
+set_cert() {
+  export LOGSTASH_CERTIFICATE=$(openssl req -x509 -batch -nodes -newkey rsa:2048 -subj /CN=localhost/)
+}
+
+start_redis() {
+  echo "requirepass ${TAIL_PASSWORD}" >> "${BATS_TEST_DIRNAME}/redis.conf"
+  redis-server "${BATS_TEST_DIRNAME}/redis.conf" &
+}
+
 teardown() {
   rm -rf /tmp/dockerlogs
   rm -rf /tmp/activitylogs
   rm -rf /tmp/test-support
   rm -f /tmp/read-from-beginning
   killall -KILL nc || true
+  pkill -KILL redis-server || true
 }
 
 @test "Joe Cool requires the LOGSTASH_ENDPOINT environment variable to be set" {
-  export LOGSTASH_CERTIFICATE=foo
-  export CONTAINERS_TO_MONITOR=bar
+  set_cert
+  export CONTAINERS="[\"baz\"]"
   run /bin/bash run-joe-cool.sh
   [ "$status" -eq 1 ]
   [[ "$output" =~ "LOGSTASH_ENDPOINT" ]]
@@ -24,24 +34,24 @@ teardown() {
 
 @test "Joe Cool requires the LOGSTASH_CERTIFICATE environment variable to be set" {
   export LOGSTASH_ENDPOINT=foo
-  export CONTAINERS_TO_MONITOR=bar
+  export CONTAINERS="[\"baz\"]"
   run /bin/bash run-joe-cool.sh
   [ "$status" -eq 1 ]
   [[ "$output" =~ "LOGSTASH_CERTIFICATE" ]]
 }
 
-@test "Joe Cool requires the CONTAINERS_TO_MONITOR environment variable to be set" {
+@test "Joe Cool requires the CONTAINERS environment variable to be set" {
   export LOGSTASH_ENDPOINT=foo
-  export LOGSTASH_CERTIFICATE=bar
+  set_cert
   run /bin/bash run-joe-cool.sh
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "CONTAINERS_TO_MONITOR" ]]
+  [[ "$output" =~ "CONTAINERS" ]]
 }
 
 @test "Joe Cool requires the /tmp/dockerlogs directory to exist" {
   export LOGSTASH_ENDPOINT=foo
-  export LOGSTASH_CERTIFICATE=bar
-  export CONTAINERS_TO_MONITOR=baz
+  set_cert
+  export CONTAINERS="[\"baz\"]"
   rm -rf /tmp/dockerlogs
   run /bin/bash run-joe-cool.sh
   [ "$status" -eq 1 ]
@@ -50,148 +60,148 @@ teardown() {
 
 @test "Joe Cool does not require the /tmp/activitylogs directory to exist" {
   export LOGSTASH_ENDPOINT=foo
-  export LOGSTASH_CERTIFICATE=bar
-  export CONTAINERS_TO_MONITOR=baz
+  set_cert
+  export CONTAINERS="[\"baz\"]"
   rm -rf /tmp/activitylogs
   run timeout -t 1 /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "prospectors initialised" ]]
-}
-
-@test "Joe Cool forwards logs to a logstash instance" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS_TO_MONITOR=foo,fee,fuu
-
-  # Set up fake Docker logs
-  mkdir /tmp/dockerlogs/foodeadbeef
-  mkdir /tmp/dockerlogs/bardeadbeef
-  touch /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log
-  touch /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log
-
-  touch /tmp/activitylogs/foodeadbeef-json.log
-  touch /tmp/activitylogs/bardeadbeef-json.log
-
-  # CONTAINERS_TO_MONITOR sets this Joe Cool instance up to monitor containers that start
-  # with foo, fee, or fuu. We'll just verify that setting up a fake server listening on
-  # 127.0.0.1:5555 and the environment variables we've set are enough to bring up a Joe
-  # Cool tailing the correct files (only foodeadbeef).
-
-  echo "no-op" | nc -l -p 5555 &
-  run timeout -t 1 /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
-  [[ "$output" =~ "Launching harvester on new file: /tmp/activitylogs/foodeadbeef-json.log" ]]
-  [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
-  [[ ! "$output" =~ "Launching harvester on new file: /tmp/activitylogs/bardeadbeef-json.log" ]]
-}
-
-@test "Joe Cool forwards logs to a logstash instance (JSON configuration)" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-
-  export JSON_CONFIGURATION=1
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS='["foo", "fee", "fuu"]'
-  export FIELDS='{}'
-
-  # Set up fake Docker logs
-  mkdir /tmp/dockerlogs/foodeadbeef
-  mkdir /tmp/dockerlogs/bardeadbeef
-  touch /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log
-  touch /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log
-
-  touch /tmp/activitylogs/foodeadbeef-json.log
-  touch /tmp/activitylogs/bardeadbeef-json.log
-
-  echo "no-op" | nc -l -p 5555 &
-  run timeout -t 1 /bin/bash run-joe-cool.sh
-
-  echo "$output"
-
-  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/foodeadbeef/foodeadbeef-json.log" ]]
-  [[ "$output" =~ "Launching harvester on new file: /tmp/activitylogs/foodeadbeef-json.log" ]]
-  [[ ! "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/bardeadbeef/bardeadbeef-json.log" ]]
-  [[ ! "$output" =~ "Launching harvester on new file: /tmp/activitylogs/bardeadbeef-json.log" ]]
+  echo $output
+  [[ "$output" =~ "Loading and starting Inputs completed. Enabled inputs: 2" ]]
 }
 
 @test "Joe Cool sends all logs once if READ_FROM_BEGINNING is set" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS_TO_MONITOR=deadbeef
+  set_cert
+
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
+
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
+  export CONTAINERS="[\"baz\"]"
+  export TAIL_PASSWORD=foo123
   export READ_FROM_BEGINNING=true
 
   # Set up fake Docker logs
-  mkdir /tmp/dockerlogs/deadbeef
-  echo 0123456789 > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+  mkdir /tmp/dockerlogs/baz
+  mkdir /tmp/dockerlogs/ignore
+  touch /tmp/dockerlogs/baz/baz-json.log
+  touch /tmp/dockerlogs/ignore/ignore-json.log
 
-  echo 0123456789 > /tmp/activitylogs/deadbeef-json.log
+  start_redis
 
-  # Our fake logs have 10 characters in them. Since we set READ_FROM_BEGINNING,
-  # the logstash forwarder should report that its file offset is 0.
-  run timeout -t 1 /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "tail (on-rotation):  false" ]]
-  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
-  [[ "$output" =~ "harvest: \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:0)" ]]
-  [[ "$output" =~ "harvest: \"/tmp/activitylogs/deadbeef-json.log\" (offset snapshot:0)" ]]
+  echo "{\"a\": 1}" >> /tmp/dockerlogs/baz/baz-json.log
+  # This shouldn't be picked up by filebeat, since it shouldn't
+  # be watching this file.
+  echo "{\"b\": 2}" >> /tmp/dockerlogs/ignore/ignore-json.log
 
-  # If we run a second time, then Joecool should *not* send the logs again.
-  run timeout -t 1 /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "tail (on-rotation):  true" ]]
-  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
-  [[ "$output" =~ "harvest: (tailing) \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:11)" ]]
+  run timeout -t 10 /bin/bash run-joe-cool.sh
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
+  echo "Out is: ${out}"
+  [ "$out" = "1" ]
 }
 
-@test "Joe Cool tails logs if the READ_FROM_BEGINNING flag isn't set" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS_TO_MONITOR=deadbeef
+@test "Joe Cool tails logs if the READ_FROM_BEGINNING flag is not set" {
+  set_cert
+
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
+
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
+  export CONTAINERS="[\"bazzzzz\"]"
+  export TAIL_PASSWORD=foo123
 
   # Set up fake Docker logs
-  mkdir /tmp/dockerlogs/deadbeef
-  echo 0123456789 > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+  mkdir /tmp/dockerlogs/bazzzzz
+  mkdir /tmp/dockerlogs/ignore
+  touch /tmp/dockerlogs/bazzzzz/bazzzzz-json.log
+  touch /tmp/dockerlogs/ignore/ignore-json.log
 
-  # Our fake logs have 10 characters in them. Since we didn't set READ_FROM_BEGINNING,
-  # the logstash forwarder should report that its file offset is 11.
-  run timeout -t 1 /bin/bash run-joe-cool.sh
-  [[ "$output" =~ "tail (on-rotation):  true" ]]
-  [[ "$output" =~ "Launching harvester on new file: /tmp/dockerlogs/deadbeef/deadbeef-json.log" ]]
-  [[ "$output" =~ "harvest: (tailing) \"/tmp/dockerlogs/deadbeef/deadbeef-json.log\" (offset snapshot:11)" ]]
+  start_redis
+
+  echo "{\"a\": 1}" >> /tmp/dockerlogs/bazzzzz/bazzzzz-json.log
+
+  run timeout -t 10 /bin/bash run-joe-cool.sh
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
+  echo "Out is: ${out}"
+  [ "$out" = "0" ]
 }
 
+
 @test "Joe Cool does not truncate lines that are at most 99KB" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS_TO_MONITOR=deadbeef
-  export READ_FROM_BEGINNING=1
+  set_cert
 
-  # Set up fake Docker logs with exactly 99 KB of data on one line.
-  mkdir /tmp/dockerlogs/deadbeef
-  printf "%0.s-" {1..101376} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
 
-  # We haven't gone over our limit of 99KB in a line, so we should not see truncation.
-  run timeout -t 1 /bin/bash run-joe-cool.sh
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
+  export CONTAINERS="[\"bazzz\"]"
+  export TAIL_PASSWORD=foo123
+  export READ_FROM_BEGINNING=true
 
-  [[ "$output" =~ "max-line-bytes:      101376" ]]
-  [[ ! "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
+  # Set up fake Docker logs
+  mkdir /tmp/dockerlogs/bazzz
+  touch /tmp/dockerlogs/bazzz/bazzz-json.log
+
+  start_redis
+
+  # Filebeat considers the metadata that it packages with the log
+  # line as part of the log line, so we can't just go straight for
+  # the full 99KB in just the log message, hence the large, but < 99KB
+  # number.
+  random=$(openssl rand -base64 74300)
+  echo $random > /tmp/dockerlogs/bazzz/bazzz-json.log
+
+  run timeout -t 10 /bin/bash run-joe-cool.sh
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
+  echo "Out is: ${out}"
+  [ "$out" = "1" ]
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw lrange filebeat 0 1)"
+  echo "Out is: ${out}"
+  ! [[ "$out" =~ "\"flags\":[\"truncated\"]" ]]
 }
 
 @test "Joe Cool will cut you if you try to send lines longer than 99KB" {
-  openssl req -x509 -batch -nodes -newkey rsa:2048 -out /tmp/test-support/jerry.crt
-  export LOGSTASH_ENDPOINT=localhost:5555
-  export LOGSTASH_CERTIFICATE=`cat /tmp/test-support/jerry.crt`
-  export CONTAINERS_TO_MONITOR=deadbeef
-  export READ_FROM_BEGINNING=1
+  set_cert
 
-  # Set up fake Docker logs with more than 99 KB of data on one line.
-  mkdir /tmp/dockerlogs/deadbeef
-  printf "%0.s-" {1..101377} > /tmp/dockerlogs/deadbeef/deadbeef-json.log
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
 
-  # We've gone over our limit of 99KB in a line, so we should see a truncation.
-  run timeout -t 1 /bin/bash run-joe-cool.sh
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
+  export CONTAINERS="[\"bazz\"]"
+  export TAIL_PASSWORD=foo123
+  export READ_FROM_BEGINNING=true
 
-  [[ "$output" =~ "max-line-bytes:      101376" ]]
-  [[ "$output" =~ "harvest: max line length reached, ignoring rest of line." ]]
+  # Set up fake Docker logs
+  mkdir /tmp/dockerlogs/bazz
+  touch /tmp/dockerlogs/bazz/bazz-json.log
+
+  start_redis
+
+  random=$(openssl rand -base64 74900)
+  echo $random > /tmp/dockerlogs/bazz/bazz-json.log
+
+  run timeout -t 10 /bin/bash run-joe-cool.sh
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
+  echo "Out is: ${out}"
+  [ "$out" = "1" ]
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw lrange filebeat 0 1)"
+  echo "Out is: ${out}"
+  [[ "$out" =~ "\"flags\":[\"truncated\"]" ]]
+  [[ "$out" =~ "${random:0:10}" ]]
 }

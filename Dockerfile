@@ -1,22 +1,32 @@
-FROM quay.io/aptible/alpine:3.3
+FROM quay.io/aptible/alpine:3.6
 
-# Build logstash-forwarder from source, verify the resulting SHA against a golden SHA.
+ENV CACHE 1
+ENV FILEBEAT_VERSION 7.4.2
+ENV SHA 19b002520d86415d85a9753787227dd223f1ea556aa877d76448d11de87e0cdeb4e270d429ea26960a1578cc89efc66d448058297e81051ef83e8a6543ebf3a2
+ENV FILEBEAT_HOME "/filebeat-${FILEBEAT_VERSION}-linux-x86_64"
+ENV PATH ${FILEBEAT_HOME}:$PATH
+
+# libc6-compat is required by filebeat:
+# https://discuss.elastic.co/t/filebeat-6-x-could-not-support-running-under-os-alpine/116195
 RUN apk update && \
-    apk-install git go ruby ruby-json && \
-    git clone git://github.com/aaw/logstash-forwarder.git && \
-    cd logstash-forwarder && \
-    git reset --hard 141d0c5d6077fa9dfbd3b6ac6b37eb0a2bd81498 && \
-    go build && \
-    apk del go git
+    apk-install curl ruby libc6-compat ruby-json
 
-# Add the logstash-forwarder config template and the bash script to run Joe Cool.
-ADD templates/logstash-forwarder.config.erb logstash-forwarder.config.erb
+
+RUN curl -O "https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz" && \
+    echo "${SHA}  filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz" | sha512sum -c - && \
+    tar zxf "filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz" && \
+    rm "filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz"
+
+WORKDIR ${FILEBEAT_HOME}
+
+ADD templates/filebeat.yml.erb filebeat.yml.erb
 ADD bin/run-joe-cool.sh run-joe-cool.sh
-ADD bin/generate-config.rb generate-config.rb
 
 # Run tests.
+RUN apk-install openssl redis
 ADD test /tmp/test
-RUN apk-install openssl && bats /tmp/test && apk del openssl
+RUN bats /tmp/test
+RUN apk del openssl redis
 
 # Any docker logs need to be mounted at /tmp/dockerlogs. Typically, this means that
 # a volume should be created mapping /var/lib/docker/containers to /tmp/dockerlogs
