@@ -132,7 +132,6 @@ teardown() {
   [ "$out" = "0" ]
 }
 
-
 @test "Joe Cool does not truncate lines that are at most 99KB" {
   set_cert
 
@@ -157,7 +156,7 @@ teardown() {
   # line as part of the log line, so we can't just go straight for
   # the full 99KB in just the log message, hence the large, but < 99KB
   # number.
-  random=$(openssl rand -base64 74300)
+  random=$(ruby -e "print 'a'*101375")
   echo $random > /tmp/dockerlogs/bazzz/bazzz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
@@ -191,8 +190,8 @@ teardown() {
 
   start_redis
 
-  random=$(openssl rand -base64 74900)
-  echo $random > /tmp/dockerlogs/bazz/bazz-json.log
+  random=$(ruby -e "print 'a'*101377 + 'b'")
+  echo "{\"log\": \"$random\", \"stream\": \"stdout\"}" > /tmp/dockerlogs/bazz/bazz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
@@ -204,4 +203,8 @@ teardown() {
   echo "Out is: ${out}"
   [[ "$out" =~ "\"flags\":[\"truncated\"]" ]]
   [[ "$out" =~ "${random:0:10}" ]]
+
+  run ruby -e "require 'json'; JSON.parse('${out}')"
+  [ "$status" -eq 0 ]
 }
+

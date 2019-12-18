@@ -11,6 +11,8 @@ filebeat.inputs:
   # TODO: Incorporate TAIL env var to determine where to start in the file
   - type: log
 
+    json.keys_under_root: false
+
     <% unless ENV['TAIL'] == "0" %>
     tail_files: true
     <% end %>
@@ -32,10 +34,11 @@ filebeat.inputs:
       container: "<%= container_id %>"
       type: json
 
-    max_bytes: 101376
     <% end %>
 
   - type: log
+
+    json.keys_under_root: false
 
     <% unless ENV['TAIL'] == "0" %>
     tail_files: true
@@ -59,9 +62,16 @@ filebeat.inputs:
       source: "aptible"
       container: "<%= container_id %>"
       type: json
-
-    max_bytes: 101376
     <% end %>
+
+#================================ Processors =====================================
+
+processors:
+  - truncate_fields:
+      fields:
+        - json.log
+      max_bytes: 101376
+      ignore_missing: true
 
 #============================== Redis output ==================================
 
