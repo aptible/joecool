@@ -156,7 +156,7 @@ teardown() {
   # line as part of the log line, so we can't just go straight for
   # the full 99KB in just the log message, hence the large, but < 99KB
   # number.
-  random=$(ruby -e "print 'a'*101375")
+  random=$(ruby -e "print 'a'*97279")
   echo $random > /tmp/dockerlogs/bazzz/bazzz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
@@ -190,7 +190,7 @@ teardown() {
 
   start_redis
 
-  random=$(ruby -e "print 'a'*101377 + 'b'")
+  random=$(ruby -e "print 'a'*97281 + 'b'")
   echo "{\"log\": \"$random\", \"stream\": \"stdout\"}" > /tmp/dockerlogs/bazz/bazz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
