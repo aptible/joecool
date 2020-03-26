@@ -9,6 +9,7 @@ filebeat.inputs:
   # Below are the input specific configurations.
 
   # TODO: Incorporate TAIL env var to determine where to start in the file
+  <% JSON.parse(ENV['CONTAINERS'] || '[]').each do |container_id| %>
   - type: log
 
     json.keys_under_root: false
@@ -21,7 +22,6 @@ filebeat.inputs:
     enabled: true
 
     # Paths that should be crawled and fetched. Glob based paths.
-    <% JSON.parse(ENV['CONTAINERS'] || '[]').each do |container_id| %>
     paths:
       - /tmp/dockerlogs/<%= container_id %>/<%= container_id %>-json.log
     # Optional additional fields. These fields can be freely picked
@@ -34,8 +34,6 @@ filebeat.inputs:
       container: "<%= container_id %>"
       type: json
 
-    <% end %>
-
   - type: log
 
     json.keys_under_root: false
@@ -48,7 +46,6 @@ filebeat.inputs:
     enabled: true
 
     # Paths that should be crawled and fetched. Glob based paths.
-    <% JSON.parse(ENV['CONTAINERS'] || '[]').each do |container_id| %>
     paths:
       - /tmp/activitylogs/<%= container_id %>-json.log
 
