@@ -208,3 +208,37 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "Joe Cool follows multiple containers" {
+  set_cert
+
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
+
+  export JSON_CONFIGURATION=1
+  export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
+  export CONTAINERS="[\"baz\", \"secondbaz\"]"
+  export TAIL_PASSWORD=foo123
+  export READ_FROM_BEGINNING=true
+
+  # Set up Docker logs
+  mkdir /tmp/dockerlogs/baz
+  mkdir /tmp/dockerlogs/secondbaz
+
+  touch /tmp/dockerlogs/baz/baz-json.log
+  touch /tmp/dockerlogs/secondbaz/secondbaz-json.log
+  touch /tmp/activitylogs/secondbaz-json.log
+
+  start_redis
+
+  echo "{\"a\": 1}" >> /tmp/dockerlogs/baz/baz-json.log
+  echo "{\"b\": 2}" >> /tmp/dockerlogs/secondbaz/secondbaz-json.log
+  echo "{\"c\": 3}" >> /tmp/activitylogs/secondbaz-json.log
+
+  run timeout -t 10 /bin/bash run-joe-cool.sh
+
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
+  echo "Out is: ${out}"
+  [ "$out" = "3" ]
+}
