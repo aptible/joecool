@@ -70,19 +70,27 @@ processors:
       max_bytes: 97280
       ignore_missing: true
 
-#============================== Redis output ==================================
+#============================== Logstash output ================================
 
+<% unless ENV['TESTING_ENV'] %>
+output.logstash:
+  hosts: ["<%= ENV['LOGSTASH_ENDPOINT'] %>"]
+  timeout: <%= ENV['LOGSTASH_TIMEOUT'] || 15 %>
+  ssl:
+    enabled: true
+    certificate_authorities: ["<%= ENV['FILEBEAT_HOME'] %>/logstash.crt"]
+<% end %>
+
+  #======================== Redis output (for tests) ============================
+
+<% if ENV['TESTING_ENV'] %>
 output.redis:
   hosts: ["<%= ENV['LOGSTASH_ENDPOINT'].split(':')[0] %>:<%= ENV['TAIL_PORT'] %>"]
   password: "<%= ENV['TAIL_PASSWORD'] %>"
   key: "filebeat"
   db: 1
   timeout: <%= ENV['LOGSTASH_TIMEOUT'] || 15 %>
-  <% unless ENV['DISABLE_SSL'] %>
-  ssl:
-    enabled: true
-    certificate_authorities: ["<%= ENV['FILEBEAT_HOME'] %>/logstash.crt"]
-  <% end %>
+<% end %>
 
 #================================ Logging =====================================
 
