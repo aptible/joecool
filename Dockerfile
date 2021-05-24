@@ -23,10 +23,10 @@ COPY templates/filebeat.yml.erb filebeat.yml.erb
 COPY bin/run-joe-cool.sh run-joe-cool.sh
 
 # Run tests.
- RUN apk-install openssl socat
+ RUN apk-install openssl redis
  ADD test /tmp/test
  RUN bats /tmp/test
- RUN apk del openssl socat
+ RUN apk del openssl redis
 
 # Any docker logs need to be mounted at /tmp/dockerlogs. Typically, this means that
 # a volume should be created mapping /var/lib/docker/containers to /tmp/dockerlogs

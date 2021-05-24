@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export TEST_OUTPUT="/tmp/netcat_output"
+  export TESTING_ENV=1
 
   mkdir /tmp/dockerlogs
   mkdir /tmp/activitylogs
@@ -9,15 +9,12 @@ setup() {
 }
 
 set_cert() {
-  # Two liner required to be able to pass the cert to socat without errors
-  openssl req -x509 -batch -nodes -out cert.pem -newkey rsa:2048 -subj /CN=localhost/
-  export LOGSTASH_CERTIFICATE=$(cat cert.pem)
+  export LOGSTASH_CERTIFICATE=$(openssl req -x509 -batch -nodes -newkey rsa:2048 -subj /CN=localhost/)
 }
 
-start_listen() {
-  echo $LOGSTASH_CERTIFICATE
-  #openssl s_server -key privkey.pem -cert cert.pem -accept 5044 -www -debug > $TEST_OUTPUT 2>&1 &
-  socat -u openssl-listen:5044,cert=cert.pem,key=privkey.pem,verify=0,reuseaddr,fork CREATE:$TEST_OUTPUT &
+start_redis() {
+  echo "requirepass ${TAIL_PASSWORD}" >> "${BATS_TEST_DIRNAME}/redis.conf"
+  redis-server "${BATS_TEST_DIRNAME}/redis.conf" &
 }
 
 teardown() {
@@ -25,9 +22,8 @@ teardown() {
   rm -rf /tmp/activitylogs
   rm -rf /tmp/test-support
   rm -f /tmp/read-from-beginning
-  rm -rf $TEST_OUTPUT
-
-  killall -KILL socat || true
+  killall -KILL nc || true
+  pkill -KILL redis-server || true
 }
 
 @test "Joe Cool requires the LOGSTASH_ENDPOINT environment variable to be set" {
@@ -77,9 +73,15 @@ teardown() {
 @test "Joe Cool sends all logs once if READ_FROM_BEGINNING is set" {
   set_cert
 
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
+
   export JSON_CONFIGURATION=1
   export LOGSTASH_ENDPOINT=localhost
+  export TAIL_PORT=6379
   export CONTAINERS="[\"baz\"]"
+  export TAIL_PASSWORD=foo123
   export READ_FROM_BEGINNING=true
 
   # Set up fake Docker logs
@@ -88,7 +90,7 @@ teardown() {
   touch /tmp/dockerlogs/baz/baz-json.log
   touch /tmp/dockerlogs/ignore/ignore-json.log
 
-  start_listen
+  start_redis
 
   echo "{\"a\": 1}" >> /tmp/dockerlogs/baz/baz-json.log
   # This shouldn't be picked up by filebeat, since it shouldn't
@@ -97,14 +99,12 @@ teardown() {
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
-  out="$( cat $TEST_OUTPUT )"
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
   echo "Out is: ${out}"
-  echo "JC said: ${output}"
   [ "$out" = "1" ]
 }
 
 @test "Joe Cool tails logs if the READ_FROM_BEGINNING flag is not set" {
-  skip
   set_cert
 
   # Disable SSL. Running stunnel here requires more overhead than it is
@@ -123,17 +123,18 @@ teardown() {
   touch /tmp/dockerlogs/bazzzzz/bazzzzz-json.log
   touch /tmp/dockerlogs/ignore/ignore-json.log
 
+  start_redis
+
   echo "{\"a\": 1}" >> /tmp/dockerlogs/bazzzzz/bazzzzz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
   echo "Out is: ${out}"
   [ "$out" = "0" ]
 }
 
 @test "Joe Cool does not truncate lines that are at most 99KB" {
-  skip
   set_cert
 
   # Disable SSL. Running stunnel here requires more overhead than it is
@@ -151,6 +152,8 @@ teardown() {
   mkdir /tmp/dockerlogs/bazzz
   touch /tmp/dockerlogs/bazzz/bazzz-json.log
 
+  start_redis
+
   # Filebeat considers the metadata that it packages with the log
   # line as part of the log line, so we can't just go straight for
   # the full 99KB in just the log message, hence the large, but < 99KB
@@ -160,17 +163,16 @@ teardown() {
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
   echo "Out is: ${out}"
   [ "$out" = "1" ]
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw lrange filebeat 0 1)"
   echo "Out is: ${out}"
   ! [[ "$out" =~ "\"flags\":[\"truncated\"]" ]]
 }
 
 @test "Joe Cool will cut you if you try to send lines longer than 99KB" {
-  skip
   set_cert
 
   # Disable SSL. Running stunnel here requires more overhead than it is
@@ -188,16 +190,18 @@ teardown() {
   mkdir /tmp/dockerlogs/bazz
   touch /tmp/dockerlogs/bazz/bazz-json.log
 
+  start_redis
+
   random=$(ruby -e "print 'a'*97281 + 'b'")
   echo "{\"log\": \"$random\", \"stream\": \"stdout\"}" > /tmp/dockerlogs/bazz/bazz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
   echo "Out is: ${out}"
   [ "$out" = "1" ]
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw lrange filebeat 0 1)"
   echo "Out is: ${out}"
   [[ "$out" =~ "\"flags\":[\"truncated\"]" ]]
   [[ "$out" =~ "${random:0:10}" ]]
@@ -207,8 +211,11 @@ teardown() {
 }
 
 @test "Joe Cool follows multiple containers" {
-  skip
   set_cert
+
+  # Disable SSL. Running stunnel here requires more overhead than it is
+  # worth, so we will just test forwarding to regular old Redis.
+  export DISABLE_SSL=1
 
   export JSON_CONFIGURATION=1
   export LOGSTASH_ENDPOINT=localhost
@@ -225,13 +232,15 @@ teardown() {
   touch /tmp/dockerlogs/secondbaz/secondbaz-json.log
   touch /tmp/activitylogs/secondbaz-json.log
 
+  start_redis
+
   echo "{\"a\": 1}" >> /tmp/dockerlogs/baz/baz-json.log
   echo "{\"b\": 2}" >> /tmp/dockerlogs/secondbaz/secondbaz-json.log
   echo "{\"c\": 3}" >> /tmp/activitylogs/secondbaz-json.log
 
   run timeout -t 10 /bin/bash run-joe-cool.sh
 
-  out=""
+  out="$(redis-cli -n 1 -a ${TAIL_PASSWORD} --raw llen filebeat)"
   echo "Out is: ${out}"
   [ "$out" = "3" ]
 }
