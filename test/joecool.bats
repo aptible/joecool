@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 
 setup() {
+  export TESTING_ENV=1
+
   mkdir /tmp/dockerlogs
   mkdir /tmp/activitylogs
   mkdir /tmp/test-support

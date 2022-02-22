@@ -1,4 +1,4 @@
 REGISTRY = quay.io
-REPOSITORY = aptible/joecool-v2
+REPOSITORY = aptible/joecool
 
 PUSH_REGISTRIES = $(REGISTRY) docker.io
